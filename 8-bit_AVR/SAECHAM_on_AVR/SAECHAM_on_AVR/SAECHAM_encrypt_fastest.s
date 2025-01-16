@@ -1,0 +1,511 @@
+﻿
+/*
+ * SAECHAM_encrypt_fastest.s
+ *
+ * Created: 2024-09-02 오후 12:22:58
+ *  Author: MYOUNGSU
+ */ 
+
+
+.macro ROR16 LO, HI
+	BST \LO, 0
+	ROR \HI
+	ROR \LO
+	BLD \HI, 7
+.endm
+
+.macro EOR_RK A0, A1
+	LD RK, Z+
+	EOR \A0, RK
+	LD RK, Z+
+	EOR \A1, RK
+.endm
+
+.global SAECHAM_encrypt_fastest
+.type SAECHAM_encrypt_fastest, @function
+
+#define RK R0
+
+#define RK00 R2
+#define RK01 R3
+#define RK10 R4
+#define RK11 R5
+#define RK20 R6
+#define RK21 R7
+#define RK30 R8
+#define RK31 R9
+#define RK40 R10
+#define RK41 R11
+#define RK50 R12
+#define RK51 R13
+#define RK60 R14
+#define RK61 R15
+#define RK70 R16
+#define RK71 R17
+
+#define PT00 R18
+#define PT01 R19
+#define PT10 R20
+#define PT11 R21
+#define PT20 R22
+#define PT21 R23
+#define PT30 R24
+#define PT31 R25
+
+#define TM0 R26
+#define TM1 R27
+
+#define RC R29
+
+.macro ROUND0
+INC RC						// RC += 1
+MOVW TM0, PT10				// TMP = PT[1]
+
+LDD RK, Z+0
+EOR TM1, RK
+LDD RK, Z+1
+EOR TM0, RK
+
+EOR PT01, RC				// PT[0] = ROL(PT[0], 8) ^ RC
+
+ADD PT01, TM1				// PT[0] += TMP
+ADC PT00, TM0
+.endm
+
+.macro ROUND1
+INC RC						// RC += 1
+MOVW TM0, PT20				// TMP = PT[2]
+
+LDD RK, Z+2
+EOR TM1, RK
+LDD RK, Z+3
+EOR TM0, RK
+
+ROR16 PT11, PT10			// PT[1] = ROL(PT[1], 7)
+EOR PT11, RC				// PT[1] ^= RC
+
+ADD PT11, TM1				// PT[1] += TMP
+ADC PT10, TM0
+.endm
+
+.macro ROUND2
+INC RC						// RC += 1
+MOVW TM0, PT30				// TMP = PT[3]
+
+LDD RK, Z+4
+EOR TM1, RK
+LDD RK, Z+5
+EOR TM0, RK
+
+EOR	PT21, RC				// PT[2] = ROL(PT[2], 8) ^ RC
+
+ADD PT21, TM1				// PT[2] += TMP
+ADC PT20, TM0
+.endm
+
+.macro ROUND3
+INC RC						// RC += 1
+MOVW TM0, PT00				// TMP = PT[0]
+
+LDD RK, Z+6
+EOR TM0, RK
+LDD RK, Z+7
+EOR TM1, RK
+
+ROR16 PT31, PT30			// PT[3] = ROL(PT[3], 7)
+EOR PT31, RC				// PT[3] ^= RC
+
+ADD PT31, TM0				// PT[3] += TMP
+ADC PT30, TM1
+.endm
+
+.macro ROUND4
+INC RC						// RC += 1
+MOVW TM0, PT10				// TMP = PT[1]
+
+LDD RK, Z+8
+EOR TM0, RK
+LDD RK, Z+9
+EOR TM1, RK
+
+EOR	PT00, RC				// PT[0] = ROL(PT[0], 8) ^ RC
+
+ADD PT00, TM0				// PT[0] += TMP
+ADC PT01, TM1
+.endm
+
+.macro ROUND5
+INC RC						// RC += 1
+MOVW TM0, PT20				// TMP = PT[2]
+
+LDD RK, Z+10
+EOR TM0, RK
+LDD RK, Z+11
+EOR TM1, RK
+
+ROR16 PT10, PT11			// PT[1] = ROL(PT[1], 7)
+EOR PT10, RC				// PT[1] ^= RC
+
+ADD PT10, TM0				// PT[1] += TMP
+ADC PT11, TM1
+.endm
+
+.macro ROUND6
+INC RC						// RC += 1
+MOVW TM0, PT30				// TMP = PT[3]
+
+LDD RK, Z+12
+EOR TM0, RK
+LDD RK, Z+13
+EOR TM1, RK
+
+EOR	PT20, RC				// PT[2] = ROL(PT[2], 8) ^ RC
+
+ADD PT20, TM0				// PT[2] += TMP
+ADC PT21, TM1
+.endm
+
+.macro ROUND7
+INC RC						// RC += 1
+MOVW TM0, PT00				// TMP = PT[0]
+
+LDD RK, Z+14
+EOR TM1, RK
+LDD RK, Z+15
+EOR TM0, RK
+
+ROR16 PT30, PT31			// PT[3] = ROL(PT[3], 7)
+EOR PT30, RC				// PT[3] ^= RC
+
+ADD PT30, TM1				// PT[3] += TMP
+ADC PT31, TM0
+.endm
+
+
+.macro STORED_ROUND0
+INC RC						// RC += 1
+MOVW TM0, PT10				// TMP = PT[1]
+
+EOR TM1, RK00				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM0, RK01
+
+EOR PT01, RC				// PT[0] = ROL(PT[0], 8) ^ RC
+
+ADD PT01, TM1				// PT[0] += TMP
+ADC PT00, TM0
+.endm
+
+.macro STORED_ROUND1
+INC RC						// RC += 1
+MOVW TM0, PT20				// TMP = PT[2]
+
+EOR TM1, RK10				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM0, RK11
+
+ROR16 PT11, PT10			// PT[1] = ROL(PT[1], 7)
+EOR PT11, RC				// PT[1] ^= RC
+
+ADD PT11, TM1				// PT[1] += TMP
+ADC PT10, TM0
+.endm
+
+.macro STORED_ROUND2
+INC RC						// RC += 1
+MOVW TM0, PT30				// TMP = PT[3]
+
+EOR TM1, RK20				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM0, RK21
+
+EOR	PT21, RC				// PT[2] = ROL(PT[2], 8) ^ RC
+
+ADD PT21, TM1				// PT[2] += TMP
+ADC PT20, TM0
+.endm
+
+.macro STORED_ROUND3
+INC RC						// RC += 1
+MOVW TM0, PT00				// TMP = PT[0]
+
+EOR TM0, RK30				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM1, RK31
+
+ROR16 PT31, PT30			// PT[3] = ROL(PT[3], 7)
+EOR PT31, RC				// PT[3] ^= RC
+
+ADD PT31, TM0				// PT[3] += TMP
+ADC PT30, TM1
+.endm
+
+.macro STORED_ROUND4
+INC RC						// RC += 1
+MOVW TM0, PT10				// TMP = PT[1]
+
+EOR TM0, RK40				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM1, RK41
+
+EOR	PT00, RC				// PT[0] = ROL(PT[0], 8) ^ RC
+
+ADD PT00, TM0				// PT[0] += TMP
+ADC PT01, TM1
+.endm
+
+.macro STORED_ROUND5
+INC RC						// RC += 1
+MOVW TM0, PT20				// TMP = PT[2]
+
+EOR TM0, RK50				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM1, RK51
+
+ROR16 PT10, PT11			// PT[1] = ROL(PT[1], 7)
+EOR PT10, RC				// PT[1] ^= RC
+
+ADD PT10, TM0				// PT[1] += TMP
+ADC PT11, TM1
+.endm
+
+.macro STORED_ROUND6
+INC RC						// RC += 1
+MOVW TM0, PT30				// TMP = PT[3]
+
+EOR TM0, RK60				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM1, RK61
+
+EOR	PT20, RC				// PT[2] = ROL(PT[2], 8) ^ RC
+
+ADD PT20, TM0				// PT[2] += TMP
+ADC PT21, TM1
+.endm
+
+.macro STORED_ROUND7
+INC RC						// RC += 1
+MOVW TM0, PT00				// TMP = PT[0]
+
+EOR TM1, RK70				// TMP = ROL(TMP, 8) ^ RK
+EOR	TM0, RK71
+
+ROR16 PT30, PT31			// PT[3] = ROL(PT[3], 7)
+EOR PT30, RC				// PT[3] ^= RC
+
+ADD PT30, TM1				// PT[3] += TMP
+ADC PT31, TM0
+.endm
+
+
+.macro EIGHT_ROUNDS
+	ROUND0
+	ROUND1
+	ROUND2
+	ROUND3
+	ROUND4
+	ROUND5
+	ROUND6
+	ROUND7
+.endm
+
+.macro STORED_EIGHT_ROUNDS
+	STORED_ROUND0
+	STORED_ROUND1
+	STORED_ROUND2
+	STORED_ROUND3
+	STORED_ROUND4
+	STORED_ROUND5
+	STORED_ROUND6
+	STORED_ROUND7
+.endm
+
+
+SAECHAM_encrypt_fastest:
+
+PUSH R2
+PUSH R3
+PUSH R4
+PUSH R5
+PUSH R6
+PUSH R7
+PUSH R8
+PUSH R9
+PUSH R10
+PUSH R11
+PUSH R12
+PUSH R13
+PUSH R14
+PUSH R15
+PUSH R16
+PUSH R17
+PUSH R29
+
+PUSH R24					//PUSH CT ADDRESS
+PUSH R25
+
+MOVW R26, R22				// PT : X pointer
+MOVW R30, R20				// RK : Z pointer
+
+LD PT00, X+
+LD PT01, X+
+LD PT10, X+
+LD PT11, X+
+LD PT20, X+
+LD PT21, X+
+LD PT30, X+
+LD PT31, X+
+
+LDI RC, 1
+
+// round 0
+MOVW TM0, PT10				// TMP = PT[1]
+
+LD RK00, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM1, RK00
+LD RK01, Z+
+EOR	TM0, RK01
+
+ADD PT01, TM1				// PT[0] = ROL(PT[0], 8) + TMP
+ADC PT00, TM0
+
+
+//round 1
+MOVW TM0, PT20				// TMP = PT[2]
+
+LD RK10, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM1, RK10
+LD RK11, Z+
+EOR	TM0, RK11
+
+ROR16 PT11, PT10			// PT[1] = ROL(PT[1], 7)
+EOR PT11, RC				// PT[1] ^= RC
+
+ADD PT11, TM1				// PT[1] += TMP
+ADC PT10, TM0
+
+// round 2
+INC RC						// RC += 1
+MOVW TM0, PT30				// TMP = PT[3]
+
+LD RK20, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM1, RK20
+LD RK21, Z+
+EOR	TM0, RK21
+
+EOR	PT21, RC				// PT[2] = ROL(PT[2], 8) ^ RC
+
+ADD PT21, TM1				// PT[2] += TMP
+ADC PT20, TM0
+
+//round 3
+INC RC						// RC += 1
+MOVW TM0, PT00				// TMP = PT[0]
+
+LD RK30, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM0, RK30
+LD RK31, Z+
+EOR	TM1, RK31
+
+ROR16 PT31, PT30			// PT[3] = ROL(PT[3], 7)
+EOR PT31, RC				// PT[3] ^= RC
+
+ADD PT31, TM0				// PT[3] += TMP
+ADC PT30, TM1
+
+
+// round 4
+INC RC						// RC += 1
+MOVW TM0, PT10				// TMP = PT[1]
+
+LD RK40, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM0, RK40
+LD RK41, Z+
+EOR	TM1, RK41
+
+EOR	PT00, RC				// PT[0] = ROL(PT[0], 8) ^ RC
+
+ADD PT00, TM0				// PT[0] += TMP
+ADC PT01, TM1
+
+//round 5
+INC RC						// RC += 1
+MOVW TM0, PT20				// TMP = PT[2]
+
+LD RK50, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM0, RK50
+LD RK51, Z+
+EOR	TM1, RK51
+
+ROR16 PT10, PT11			// PT[1] = ROL(PT[1], 7)
+EOR PT10, RC				// PT[1] ^= RC
+
+ADD PT10, TM0				// PT[1] += TMP
+ADC PT11, TM1
+
+
+// round 6
+INC RC						// RC += 1
+MOVW TM0, PT30				// TMP = PT[3]
+
+LD RK60, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM0, RK60
+LD RK61, Z+
+EOR	TM1, RK61
+
+EOR	PT20, RC				// PT[2] = ROL(PT[2], 8) ^ RC
+
+ADD PT20, TM0				// PT[2] += TMP
+ADC PT21, TM1
+
+
+//round 7
+INC RC						// RC += 1
+MOVW TM0, PT00				// TMP = PT[0]
+
+LD RK70, Z+					// TMP = ROL(TMP, 8) ^ RK
+EOR TM1, RK70
+LD RK71, Z+
+EOR	TM0, RK71
+
+ROR16 PT30, PT31			// PT[3] = ROL(PT[3], 7)
+EOR PT30, RC				// PT[3] ^= RC
+
+ADD PT30, TM1				// PT[3] += TMP
+ADC PT31, TM0
+
+
+EIGHT_ROUNDS
+STORED_EIGHT_ROUNDS
+EIGHT_ROUNDS
+STORED_EIGHT_ROUNDS
+EIGHT_ROUNDS
+STORED_EIGHT_ROUNDS
+EIGHT_ROUNDS
+STORED_EIGHT_ROUNDS
+EIGHT_ROUNDS
+STORED_EIGHT_ROUNDS
+
+POP R27						// CT : X pointer
+POP R26
+
+ST X+, PT00
+ST X+, PT01
+ST X+, PT10
+ST X+, PT11
+ST X+, PT20
+ST X+, PT21
+ST X+, PT30
+ST X+, PT31
+
+POP R29
+POP R17
+POP R16
+POP R15
+POP R14
+POP R13
+POP R12
+POP R11
+POP R10
+POP R9
+POP R8
+POP R7
+POP R6
+POP R5
+POP R4
+POP R3
+POP R2
+RET
