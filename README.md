@@ -4,7 +4,7 @@
 
 This repository provides various optimized implementations of **SAECHAM (Secure And Efficient CHAM)**, a lightweight ARX (Addition-Rotation-XOR) based block cipher. SAECHAM significantly enhances the security and efficiency of the original CHAM block cipher.
 
-This research was published in the prestigious **IEEE Internet of Things Journal**.
+This research was published in **IEEE Internet of Things Journal**.
 
 DOI: 10.1109/JIOT.2025.3569746
 
